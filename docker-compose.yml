@@ -1,0 +1,32 @@
+﻿version: '3.4'
+
+services:
+  # 1. Web Sitemiz
+  imagecompressor.web:
+    image: ${DOCKER_REGISTRY-}imagecompressorweb
+    build:
+      context: .
+      dockerfile: ImageCompressor.Web/Dockerfile
+    ports:
+      - "5000:8080"
+    depends_on:
+      - db # Veritabanını bekle
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=ImageStudioDb;Username=postgres;Password=bu_cok_gizli_bir_sifre;
+
+  # 2. PostgreSQL Veritabanı (Bunu ekliyoruz)
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=bu_cok_gizli_bir_sifre
+      - POSTGRES_DB=ImageStudioDb
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

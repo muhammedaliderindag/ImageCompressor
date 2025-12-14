@@ -1,0 +1,66 @@
+﻿@inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@using ImageCompressor.Web.Auth
+
+<div class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom fixed-top">
+        <div class="container">
+            <a @href="/" class="navbar-brand brand-logo" href="">⚡ ImageStudio</a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+
+                <ul class="navbar-nav mx-auto align-items-center">
+                    <li class="nav-item"><NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" style="color:white;" href="" Match="NavLinkMatch.All">Ana Sayfa</NavLink></li>
+                    <li class="nav-item ms-2"><NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" style="color:white;" href="compressor">Sıkıştırma</NavLink></li>
+                    <li class="nav-item ms-2"><NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" style="color:white;" href="resize">Boyutlandırma</NavLink></li>
+                    <li class="nav-item ms-2"><NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" style="color:white;" href="convert">Dönüştürme</NavLink></li>
+                    <li class="nav-item ms-2"><NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" style="color:white;" href="bulk">Toplu Sıkıştırma</NavLink></li>
+                </ul>
+
+                <ul class="navbar-nav align-items-center">
+                    <AuthorizeView>
+                        <Authorized>
+                            <li class="nav-item ms-2">
+                                <NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" href="history" style="color:white;">
+                                    Geçmişim
+                                </NavLink>
+                            </li>
+                            <li class="nav-item ms-3 d-flex align-items-center">
+                                <span class="text-muted me-2 small">@context.User.Identity?.Name</span>
+                                <button class="btn btn-sm btn-outline-danger rounded-pill" @onclick="Logout">Çıkış</button>
+                            </li>
+                        </Authorized>
+                        <NotAuthorized>
+                            <li class="nav-item ms-3"><NavLink class="btn btn-sm btn-primary rounded-pill px-3" href="login">Giriş</NavLink></li>
+                            <li class="nav-item ms-2"><NavLink class="btn btn-sm btn-outline-light rounded-pill px-3" href="register">Kayıt</NavLink></li>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </ul>
+
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow-1 container d-flex flex-column justify-content-center" style="padding-top: 80px;">
+        @Body
+    </main>
+
+    <footer class="mt-auto text-center text-muted py-3 border-top border-secondary bg-dark bg-opacity-25">
+        <small>&copy; 2025 ImageStudio.</small>
+    </footer>
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        await LocalStorage.RemoveItemAsync("authToken");
+        ((CustomAuthStateProvider)AuthStateProvider).NotifyUserLogout();
+        NavManager.NavigateTo("/");
+    }
+}

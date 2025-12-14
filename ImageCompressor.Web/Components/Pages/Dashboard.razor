@@ -1,0 +1,214 @@
+﻿@page "/dashboard"
+@using ImageCompressor.Web.Data
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Timers
+@inject SystemMonitorService MonitorService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IDisposable
+
+<PageTitle>Sistem Paneli</PageTitle>
+
+@if (isLoading)
+{
+    <div class="container mt-5 text-center">
+        <div class="glass-card fade-in-up py-5">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <h4 class="text-white">Sistem Verileri Yükleniyor...</h4>
+        </div>
+    </div>
+}
+else if (isAuthorized)
+{
+    <div class="container mt-4">
+        <div class="glass-card fade-in-up">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3 class="text-white mb-0"><i class="bi bi-speedometer2 me-2"></i>Kaynak İzleme Paneli</h3>
+                    <small class="text-muted">Docker Konteyner Limitleri ve Kullanımı</small>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-success animate-pulse mb-1">● Canlı</span>
+                    <div class="small text-muted" style="font-size: 0.75rem">Güncelleme: 1sn</div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+
+                @* --- RAM KULLANIMI KARTI --- *@
+                <div class="col-md-6">
+                    <div class="p-4 rounded border border-secondary bg-dark bg-opacity-50 h-100 position-relative overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="text-info m-0"><i class="bi bi-memory me-2"></i>RAM Kullanımı</h5>
+                            <h3 class="text-white m-0">% @metrics.MemoryUsagePercent.ToString("F1")</h3>
+                        </div>
+
+                        @* İlerleme Çubuğu *@
+                        <div class="progress bg-secondary bg-opacity-25" style="height: 20px;">
+                            <div class="progress-bar bg-info progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 style="width: @((int)metrics.MemoryUsagePercent)%">
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-3 text-muted small">
+                            <span>Kullanılan: <strong class="text-white">@FormatSize(metrics.MemoryUsed)</strong></span>
+                            <span>Limit: <strong class="text-white">@FormatSize(metrics.TotalMemory)</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                @* --- CPU KULLANIMI KARTI --- *@
+                <div class="col-md-6">
+                    <div class="p-4 rounded border border-secondary bg-dark bg-opacity-50 h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="text-warning m-0"><i class="bi bi-cpu me-2"></i>CPU Yükü</h5>
+                            <h3 class="text-white m-0">% @metrics.CpuUsagePercent.ToString("F1")</h3>
+                        </div>
+
+                        @* İlerleme Çubuğu - Renk CPU yüküne göre değişir *@
+                        <div class="progress bg-secondary bg-opacity-25" style="height: 20px;">
+                            <div class="progress-bar @GetCpuColor(metrics.CpuUsagePercent) progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 style="width: @((int)metrics.CpuUsagePercent)%">
+                            </div>
+                        </div>
+
+                        <div class="row mt-3 text-center">
+                            <div class="col-6 border-end border-secondary">
+                                <h4 class="text-white mb-0">@metrics.ProcessorCount</h4>
+                                <small class="text-muted">Çekirdek</small>
+                            </div>
+                            <div class="col-6">
+                                <h4 class="text-white mb-0">@metrics.ThreadCount</h4>
+                                <small class="text-muted">Thread</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @* --- KONTEYNER DETAYLARI --- *@
+                <div class="col-12">
+                    <div class="p-3 rounded border border-secondary bg-dark bg-opacity-25 mt-2">
+                        <div class="row text-center text-md-start">
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <small class="text-muted d-block">Sanal Sunucu (Container ID)</small>
+                                <code class="text-primary fs-5">@metrics.HostName</code>
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <small class="text-muted d-block">İşletim Sistemi</small>
+                                <span class="text-white">@metrics.OsDescription</span>
+                            </div>
+                            <div class="col-md-4">
+                                <small class="text-muted d-block">Çalışma Süresi</small>
+                                <span class="text-success fw-bold font-monospace">@metrics.Uptime.ToString(@"dd\.hh\:mm\:ss")</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-danger m-5">Bu sayfaya erişim yetkiniz yok.</div>
+}
+
+<style>
+    .animate-pulse {
+        animation: pulse 1.5s infinite;
+    }
+
+    @@keyframes pulse {
+        0% {
+            opacity: 0.6;
+        }
+
+        50% {
+            opacity: 1;
+        }
+
+        100% {
+            opacity: 0.6;
+        }
+    }
+</style>
+
+@code {
+    private SystemMetrics metrics = new();
+    private Timer? _timer;
+    private bool isLoading = true;
+    private bool isAuthorized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            if (user.Identity == null || !user.Identity.IsAuthenticated)
+            {
+                NavManager.NavigateTo("login");
+                return;
+            }
+
+            var roleClaim = user.Claims.FirstOrDefault(c =>
+                c.Type == "role" || c.Type == ClaimTypes.Role || c.Type.EndsWith("/role"));
+
+            if (roleClaim == null || !roleClaim.Value.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                NavManager.NavigateTo("/");
+                return;
+            }
+
+            isAuthorized = true;
+            isLoading = false;
+
+            StartMonitoring();
+            StateHasChanged();
+        }
+    }
+
+    private void StartMonitoring()
+    {
+        // İlk veriyi al (CPU %0 gelebilir, normaldir)
+        metrics = MonitorService.GetMetrics();
+
+        _timer = new Timer(1000); // 1 saniyede bir güncelle
+        _timer.Elapsed += (sender, e) =>
+        {
+            metrics = MonitorService.GetMetrics();
+            InvokeAsync(StateHasChanged);
+        };
+        _timer.Start();
+    }
+
+    // Byte'ı MB/GB formatına çevirir
+    private string FormatSize(long bytes)
+    {
+        if (bytes >= 1073741824) // GB
+            return $"{(bytes / 1073741824.0):F2} GB";
+
+        return bytes > 1048576
+            ? $"{(bytes / 1048576.0):F2} MB"
+            : $"{(bytes / 1024.0):F2} KB";
+    }
+
+    // CPU yüküne göre renk değiştir (Yeşil -> Sarı -> Kırmızı)
+    private string GetCpuColor(double percent) => percent switch
+    {
+        > 80 => "bg-danger",   // Kritik
+        > 50 => "bg-warning",  // Orta
+        _ => "bg-success"      // Rahat
+    };
+
+    public void Dispose()
+    {
+        _timer?.Dispose();
+    }
+}

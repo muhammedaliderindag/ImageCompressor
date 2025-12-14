@@ -1,0 +1,62 @@
+﻿@page "/login"
+@using ImageCompressor.Web.Auth
+@using Blazored.LocalStorage
+@inject AuthService AuthService
+@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@rendermode InteractiveServer
+
+<PageTitle>Giriş Yap</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+    <div class="glass-card fade-in-up" style="width: 100%; max-width: 400px;">
+        <div class="text-center mb-4">
+            <i class="bi bi-person-circle display-4" style="color: var(--primary-color);"></i>
+            <h3 class="mt-3">Giriş Yap</h3>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Kullanıcı Adı</label>
+            <input @bind="username" class="form-control bg-dark text-white border-secondary" placeholder="Kullanıcı adınız" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Şifre</label>
+            <input @bind="password" type="password" class="form-control bg-dark text-white border-secondary" placeholder="******" />
+        </div>
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger py-2 small">@errorMessage</div>
+        }
+
+        <button class="btn btn-primary w-100 mt-3" @onclick="HandleLogin">
+            Giriş Yap
+        </button>
+
+        <div class="text-center mt-3">
+            <small class="text-muted">Hesabın yok mu? <a href="register" class="text-decoration-none" style="color: var(--secondary-color);">Kayıt Ol</a></small>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private string errorMessage = "";
+
+    private async Task HandleLogin()
+    {
+        var token = AuthService.Login(username, password);
+        if (token != null)
+        {
+            await LocalStorage.SetItemAsync("authToken", token);
+            ((CustomAuthStateProvider)AuthStateProvider).NotifyUserAuthentication(token);
+            NavManager.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Kullanıcı adı veya şifre hatalı!";
+        }
+    }
+}

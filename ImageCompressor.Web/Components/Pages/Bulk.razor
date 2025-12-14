@@ -1,0 +1,258 @@
+﻿@page "/bulk"
+@using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Formats.Jpeg
+@using SixLabors.ImageSharp.Processing
+@using System.IO.Compression
+@using ImageCompressor.Web.Data  
+@using System.Security.Claims    
+@using Microsoft.AspNetCore.Components.Authorization 
+@inject HistoryService HistoryService 
+@inject AuthenticationStateProvider AuthStateProvider 
+@rendermode InteractiveServer
+
+<PageTitle>Toplu Sıkıştırma</PageTitle>
+
+<div class="container-fluid" style="max-width: 1200px;">
+    <div class="row g-4">
+
+        <div class="col-lg-8">
+            <div class="glass-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0 text-white"><i class="bi bi-images me-2"></i>Resim Galerisi</h4>
+                    @if (uploadedImages.Any())
+                    {
+                        <button class="btn btn-outline-danger btn-sm rounded-pill" @onclick="ClearAll">
+                            <i class="bi bi-trash"></i> Hepsini Temizle
+                        </button>
+                    }
+                </div>
+
+                <div class="d-flex flex-wrap gap-3">
+                    @foreach (var img in uploadedImages)
+                    {
+                        <div class="position-relative" style="width: 120px; height: 120px;">
+                            <img src="@img.PreviewBase64" class="w-100 h-100 rounded border border-secondary object-fit-cover shadow-sm" />
+                            <button class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 py-0 px-1"
+                                    style="font-size: 0.7rem;"
+                                    @onclick="() => RemoveImage(img)">
+                                ✕
+                            </button>
+                            <div class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-75 text-white text-center rounded-bottom py-1"
+                                 style="font-size: 0.7rem;">
+                                @FormatSize(img.OriginalSize)
+                            </div>
+                        </div>
+                    }
+
+                    <div class="position-relative d-flex align-items-center justify-content-center border border-dashed border-secondary rounded bg-dark bg-opacity-25 hover-effect"
+                         style="width: 120px; height: 120px; cursor: pointer;">
+                        <div class="text-center text-muted">
+                            <i class="bi bi-plus-lg display-6"></i>
+                            <div style="font-size: 0.8rem;">Ekle</div>
+                        </div>
+                        <InputFile OnChange="@LoadFiles" multiple
+                                   class="position-absolute w-100 h-100 opacity-0"
+                                   style="cursor: pointer;"
+                                   accept=".jpg,.jpeg,.png" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="glass-card position-sticky" style="top: 100px;">
+                <h4 class="mb-4 text-warning">Ayarlar</h4>
+
+                <div class="mb-3">
+                    <label class="form-label">Sıkıştırma Kalitesi: % @quality</label>
+                    <input type="range" @bind="quality" min="10" max="90" class="form-range" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Maksimum Genişlik (Opsiyonel)</label>
+                    <input type="number" @bind="maxWidth" class="form-control" placeholder="Örn: 1920 (Boşsa değişmez)" />
+                </div>
+
+                <button class="btn btn-warning w-100 fw-bold"
+                        @onclick="ProcessAndZip"
+                        disabled="@(!uploadedImages.Any() || isLoading)">
+                    @if (isLoading)
+                    {
+                        <span><span class="spinner-border spinner-border-sm me-2"></span>Hazırlanıyor...</span>
+                    }
+                    else
+                    {
+                        <span>📦 Zip Oluştur ve İndir</span>
+                    }
+                </button>
+
+                @if (zipDownloadUrl != null)
+                {
+                    <div class="mt-3 alert alert-success text-center">
+                        <a href="@zipDownloadUrl" download="optimized-images.zip" class="fw-bold text-success">
+                            ⬇️ İndirmek İçin Tıkla
+                        </a>
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .object-fit-cover { object-fit: cover; }
+    .hover-effect:hover { background-color: rgba(255,255,255,0.1) !important; border-color: white !important; }
+</style>
+
+@code {
+    class ImageItem
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Name { get; set; } = "";
+        public long OriginalSize { get; set; }
+        public byte[] Content { get; set; } = Array.Empty<byte>();
+        public string PreviewBase64 { get; set; } = "";
+    }
+
+    private List<ImageItem> uploadedImages = new();
+    private int quality = 60;
+    private int? maxWidth;
+    private bool isLoading = false;
+    private string? zipDownloadUrl;
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        zipDownloadUrl = null;
+        // Limit artırıldı: Max 50 dosya
+        var files = e.GetMultipleFiles(50); 
+
+        foreach (var file in files)
+        {
+            try
+            {
+                // Her dosya için limit 20MB
+                using var stream = file.OpenReadStream(20L * 1024 * 1024);
+                using var ms = new MemoryStream();
+                await stream.CopyToAsync(ms);
+                var content = ms.ToArray();
+                
+                // Önizleme oluştur
+                using var image = Image.Load(content);
+                // Thumbnail için küçük bir kopya
+                image.Mutate(x => x.Resize(new ResizeOptions { Size = new Size(100, 100), Mode = ResizeMode.Crop }));
+
+                using var previewMs = new MemoryStream();
+                await image.SaveAsJpegAsync(previewMs);
+
+                var previewBase64 = $"data:image/jpeg;base64,{Convert.ToBase64String(previewMs.ToArray())}";
+
+                uploadedImages.Add(new ImageItem
+                {
+                    Name = file.Name,
+                    OriginalSize = file.Size,
+                    Content = content,
+                    PreviewBase64 = previewBase64
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Hata: {ex.Message}");
+            }
+        }
+    }
+
+    private void RemoveImage(ImageItem item)
+    {
+        uploadedImages.Remove(item);
+        zipDownloadUrl = null;
+    }
+
+    private void ClearAll()
+    {
+        uploadedImages.Clear();
+        zipDownloadUrl = null;
+    }
+
+    private async Task ProcessAndZip()
+    {
+        if (!uploadedImages.Any()) return;
+        isLoading = true;
+        await Task.Delay(1);
+
+        long totalProcessedSize = 0; // Toplam işlenmiş boyut
+
+        try
+        {
+            using var zipMs = new MemoryStream();
+            using (var archive = new ZipArchive(zipMs, ZipArchiveMode.Create, true))
+            {
+                foreach (var item in uploadedImages)
+                {
+                    using var img = Image.Load(item.Content);
+                    if (maxWidth.HasValue)
+                    {
+                        img.Mutate(x => x.Resize(new ResizeOptions
+                        {
+                            Size = new Size(maxWidth.Value, 0),
+                            Mode = ResizeMode.Max
+                        }));
+                    }
+
+                    using var compressedMs = new MemoryStream();
+                    await img.SaveAsJpegAsync(compressedMs, new JpegEncoder { Quality = quality });
+                    totalProcessedSize += compressedMs.Length; // Boyutu topla
+                    compressedMs.Position = 0;
+
+                    var entry = archive.CreateEntry(Path.GetFileNameWithoutExtension(item.Name) + ".jpg");
+                    using var entryStream = entry.Open();
+                    await compressedMs.CopyToAsync(entryStream);
+                }
+            }
+
+            zipMs.Position = 0;
+            zipDownloadUrl = $"data:application/zip;base64,{Convert.ToBase64String(zipMs.ToArray())}";
+
+            // --- GEÇMİŞ KAYDETME (EKLENEN KISIM) ---
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+
+                if (user.Identity != null && user.Identity.IsAuthenticated)
+                {
+                    var userIdClaim = user.Claims.FirstOrDefault(c => 
+                        c.Type == ClaimTypes.NameIdentifier || 
+                        c.Type == "nameid" || 
+                        c.Type == "sub" ||
+                        c.Type == "id");
+
+                    if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+                    {
+                        // Detay: "12 Dosya | Toplam: 5.4 MB"
+                        string details = $"{uploadedImages.Count} Dosya | Zip: {FormatSize(totalProcessedSize)}";
+                        
+                        // Dosya Adı yerine "Toplu İşlem (Bulk)" yazıyoruz
+                        await HistoryService.AddHistoryAsync(userId, "Bulk Zip", "Toplu Paket", details);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Geçmiş kaydedilemedi: " + ex.Message);
+            }
+            // ---------------------------------------
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Zip hatası: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private string FormatSize(long bytes) => bytes > 1024 * 1024 ?
+        $"{(bytes / 1048576.0):F2} MB" : $"{(bytes / 1024.0):F2} KB";
+}

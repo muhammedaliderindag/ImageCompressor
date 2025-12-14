@@ -1,0 +1,36 @@
+﻿@page "/"
+
+<PageTitle>Ana Sayfa</PageTitle>
+
+<div class="text-center w-100">
+    <div>
+        <h1 class="display-3 fw-bold mb-3">
+            Resim <span style="color: var(--secondary-color)">Stüdyosu</span>
+        </h1>
+        <p class="lead text-muted mb-5 mx-auto" style="max-width: 600px;">
+            Hızlı, güvenli ve modern resim işleme araçları.
+        </p>
+
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="compressor" class="btn btn-primary btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale">🚀 Sıkıştırma</a>
+            <a href="resize" class="btn btn-primary btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale">📐 Boyutlandırma</a>
+            <a href="convert" class="btn btn-primary btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale">🔄 Dönüştürme</a>
+            <a href="bulk" class="btn btn-primary btn-lg px-4 py-3 rounded-pill shadow-lg hover-scale">📦 Toplu Sıkıştırma</a>
+        </div>
+    </div>
+</div>
+<style>
+    /* H1 Odaklandığında Çizgiyi Kaldır */
+    h1:focus {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+
+    .hover-scale {
+        transition: transform 0.2s;
+    }
+
+        .hover-scale:hover {
+            transform: scale(1.05);
+        }
+</style>
