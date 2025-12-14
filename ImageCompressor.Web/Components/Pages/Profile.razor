@@ -1,0 +1,186 @@
+﻿@page "/profile"
+@using ImageCompressor.Web.Auth
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavManager
+@* @attribute [Authorize] SATIRINI KALDIRDIK *@
+@rendermode InteractiveServer
+
+<PageTitle>Profilim</PageTitle>
+
+@if (!isAuthorized)
+{
+    @* Yetki kontrolü yapılırken boş ekran veya yükleniyor gösterelim *@
+    <div class="text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+    </div>
+}
+else
+{
+    <div class="container mt-4" style="max-width: 800px;">
+        <div class="glass-card fade-in-up">
+
+            <div class="d-flex align-items-center mb-4 border-bottom border-secondary pb-3">
+                <div class="bg-primary bg-opacity-25 rounded-circle p-3 me-3 text-primary">
+                    <i class="bi bi-person-lines-fill display-6"></i>
+                </div>
+                <div>
+                    <h3 class="text-white mb-0">Profil Bilgileri</h3>
+                    <small class="text-muted">Hesap ayarlarınızı buradan yönetebilirsiniz.</small>
+                </div>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Bilgiler yükleniyor...</p>
+                </div>
+            }
+            else if (currentUser != null)
+            {
+                <div class="row g-3">
+                    @* --- KİŞİSEL BİLGİLER --- *@
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Ad</label>
+                        <input @bind="currentUser.FirstName" class="form-control bg-dark text-white border-secondary" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Soyad</label>
+                        <input @bind="currentUser.LastName" class="form-control bg-dark text-white border-secondary" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">E-Posta</label>
+                        <input @bind="currentUser.Email" class="form-control bg-dark text-white border-secondary" />
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Kullanıcı Adı</label>
+                        <input value="@currentUser.Username" class="form-control bg-dark text-white border-secondary" disabled style="opacity: 0.6;" />
+                    </div>
+
+                    <div class="col-12 mt-4">
+                        <h5 class="text-white border-bottom border-secondary pb-2 mb-3">Güvenlik</h5>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label text-muted">Yeni Şifre</label>
+                        <input @bind="newPassword" type="password" class="form-control bg-dark text-white border-secondary" placeholder="Değiştirmek istemiyorsanız boş bırakın" />
+                    </div>
+
+                    @* --- MESAJ ALANI --- *@
+                    @if (!string.IsNullOrEmpty(message))
+                    {
+                        <div class="col-12 mt-3">
+                            <div class="alert @(isSuccess ? "alert-success" : "alert-danger")">
+                                @if (isSuccess)
+                                {
+                                    <i class="bi bi-check-circle-fill me-2"></i>
+                                }
+                                else
+                                {
+
+                                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                }
+                                @message
+                            </div>
+                        </div>
+                    }
+
+                    <div class="col-12 mt-4 d-flex gap-2">
+                        <button class="btn btn-success px-4" @onclick="SaveChanges">
+                            <i class="bi bi-save me-2"></i>Değişiklikleri Kaydet
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick='() => NavManager.NavigateTo("/")'>
+                            İptal
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger">Kullanıcı bilgileri yüklenemedi.</div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private UserAccount? currentUser;
+    private string? newPassword;
+    private bool isLoading = true;
+    private bool isAuthorized = false; // Sayfanın görünürlüğünü kontrol eder
+    private string message = "";
+    private bool isSuccess = false;
+
+    // History.razor ve Dashboard.razor'daki gibi manuel kontrol
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+
+            // KULLANICI GİRİŞ YAPMIŞ MI?
+            if (user.Identity != null && user.Identity.IsAuthenticated)
+            {
+                // Evet, giriş yapmış. ID'sini alalım.
+                var userIdClaim = user.Claims.FirstOrDefault(c =>
+                    c.Type == ClaimTypes.NameIdentifier ||
+                    c.Type == "nameid" ||
+                    c.Type == "sub" ||
+                    c.Type == "id");
+
+                if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+                {
+                    // Kullanıcı verisini çek
+                    currentUser = AuthService.GetUserById(userId);
+                    isAuthorized = true; // Sayfayı göster
+                }
+                else
+                {
+                    // Token var ama ID yoksa yine de login'e atalım
+                    NavManager.NavigateTo("login");
+                }
+            }
+            else
+            {
+                // Hayır, giriş yapmamış. Login sayfasına gönder.
+                NavManager.NavigateTo("login");
+            }
+
+            isLoading = false;
+            StateHasChanged(); // Arayüzü güncelle
+        }
+    }
+
+    private void SaveChanges()
+    {
+        if (currentUser == null) return;
+
+        if (string.IsNullOrWhiteSpace(currentUser.FirstName) || string.IsNullOrWhiteSpace(currentUser.LastName))
+        {
+            message = "Ad ve Soyad boş bırakılamaz.";
+            isSuccess = false;
+            return;
+        }
+
+        // Güncelleme işlemini yap
+        var result = AuthService.UpdateUser(currentUser, newPassword);
+
+        if (result)
+        {
+            message = "Profiliniz başarıyla güncellendi.";
+            isSuccess = true;
+            newPassword = "";
+        }
+        else
+        {
+            message = "Güncelleme sırasında bir hata oluştu.";
+            isSuccess = false;
+        }
+    }
+}

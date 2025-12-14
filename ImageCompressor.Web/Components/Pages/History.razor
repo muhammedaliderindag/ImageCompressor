@@ -9,8 +9,6 @@
 
 <PageTitle>İşlem Geçmişi</PageTitle>
 
-@* AuthorizeView ile kaplamamıza gerek yok, manuel kontrol daha sağlıklı çalışıyor *@
-
 <div class="container mt-4" style="max-width: 900px;">
     <div class="glass-card fade-in-up">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -32,11 +30,7 @@
                 <p class="mt-3">Henüz hiç işlem yapmadınız.</p>
                 <a href="compressor" class="btn btn-outline-light btn-sm mt-2">Hemen Başla</a>
 
-                @* Hata Ayıklama (Görünmezse buradaki ID'yi kontrol etmek için) *@
-                @if (debugUserId != 0)
-                {
-                    <div class="mt-3 small text-danger">Debug: ID (@debugUserId) ile sorgu yapıldı ama kayıt bulunamadı.</div>
-                }
+                @* DEBUG KODU BURADAN KALDIRILDI *@
             </div>
         }
         else
@@ -69,6 +63,10 @@
                                     {
                                         <span class="badge bg-info text-dark">Dönüştürme</span>
                                     }
+                                    else if (item.ActionType == "Bulk Zip")
+                                    {
+                                        <span class="badge bg-success">Toplu İşlem</span>
+                                    }
                                     else
                                     {
                                         <span class="badge bg-secondary">@item.ActionType</span>
@@ -88,7 +86,7 @@
 @code {
     private List<UserHistory> historyList = new();
     private bool isLoading = true;
-    private int debugUserId = 0; // Hata ayıklama için
+    // debugUserId değişkeni kaldırıldı
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -99,9 +97,6 @@
 
             if (user.Identity != null && user.Identity.IsAuthenticated)
             {
-                // --- DÜZELTME BURADA ---
-                // Sadece ClaimTypes.NameIdentifier'a bakmak yetmez.
-                // Token içindeki tüm olası ID alanlarını kontrol ediyoruz.
                 var userIdClaim = user.Claims.FirstOrDefault(c =>
                     c.Type == ClaimTypes.NameIdentifier ||
                     c.Type == "nameid" ||
@@ -110,21 +105,19 @@
 
                 if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
                 {
-                    debugUserId = userId; // ID bulundu
+                    // ID ataması kaldırıldı, sadece listeyi çekiyoruz
                     historyList = await HistoryService.GetUserHistoryAsync(userId);
                 }
                 else
                 {
                     Console.WriteLine("History Sayfası Hatası: Kullanıcı ID claim'i bulunamadı!");
                 }
-                // -----------------------
 
                 isLoading = false;
-                StateHasChanged(); // Arayüzü güncelle
+                StateHasChanged();
             }
             else
             {
-                // Giriş yapmamışsa Login'e gönder
                 NavManager.NavigateTo("login");
             }
         }

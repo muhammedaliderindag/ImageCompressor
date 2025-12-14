@@ -31,8 +31,12 @@
                                     Geçmişim
                                 </NavLink>
                             </li>
+                            <li class="nav-item ms-2">
+                                <NavLink class="nav-link btn btn-outline-primary border-0 px-3 rounded-pill" href="profile" style="color:white;">
+                                    Profil
+                                </NavLink>
+                            </li>
                             <li class="nav-item ms-3 d-flex align-items-center">
-                                <span class="text-muted me-2 small">@context.User.Identity?.Name</span>
                                 <button class="btn btn-sm btn-outline-danger rounded-pill" @onclick="Logout">Çıkış</button>
                             </li>
                         </Authorized>
