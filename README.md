@@ -1,6 +1,6 @@
 # 📷 ImageCompressor
 
-* **https://imagestudio.mazosfer.com/** Canlı örneğini görmek için kullanabilirsiniz.
+🔗 **Canlı Demo:** [Projeyi Görüntüle](https://imagestudio.mazosfer.com/)
 
 **ImageCompressor**, görüntüleri web arayüzü üzerinden yükleyip optimize etmenizi (sıkıştırmanızı) sağlayan, modern teknolojilerle geliştirilmiş açık kaynaklı bir web uygulamasıdır.
 
